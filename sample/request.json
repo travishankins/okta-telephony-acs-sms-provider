@@ -1,0 +1,11 @@
+
+{
+  "data": {
+    "messageProfile": {
+      "phoneNumber": "+15551234567",
+      "otpCode": "123456",
+      "deliveryChannel": "SMS",
+      "msgTemplate": "Your verification code is ${otpCode}"
+    }
+  }
+}
