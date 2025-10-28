@@ -173,7 +173,13 @@ I can add a sample Event Grid handler on request.
 | ------------------------------------------ | ---------------------------------- | ------------------------------------------------------------------------ |
 | `401 Unauthorized` from function           | Bad/missing `Authorization` header | Verify Okta hook auth settings and secret/client credentials             |
 | Okta reports timeout                       | Cold start / long ACS call         | Use a suitable plan, pre-warm, handle timeouts, return fast on errors    |
-| ACS shows accepted but user didn’t get SMS | Carrier filtering / invalid number | Wire up delivery reports; check `transactionId` path                     |
+| ACS shows accepted but user didn't get SMS | Carrier filtering / invalid number | Wire up delivery reports; check `transactionId` path                     |
 | `400` from function                        | Payload shape differs              | Validate `phoneNumber`, `otpCode`, `deliveryChannel == "SMS"` in handler |
 
 ---
+
+<div align="center">
+
+**Built with ❤️ following Azure Well-Architected Framework best practices**
+
+</div>
