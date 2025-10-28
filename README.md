@@ -1,117 +1,161 @@
 
-# Okta → Azure Communication Services (ACS) SMS Provider (Azure Functions • Python)
+# Okta Telephony Provider for Azure Communication Services
 
-This Function receives Okta **Telephony Inline Hook** requests and sends OTP SMS using **Azure Communication Services (ACS)** (e.g., a short code or long code). It returns the Okta-required `commands` payload with `status` (`SUCCESS` or `FAILED`) and an ACS transaction/message ID.
+> **Integrate Okta SMS MFA with Azure Communication Services for enterprise-grade OTP delivery**
 
-## Why this exists
-- Keep Okta’s SMS MFA while sending through your own ACS telephony.
-- Keep the function fast and observable, with optional delivery reports.
+This Azure Function implements an Okta Telephony Inline Hook endpoint that processes OTP requests and delivers SMS messages through Azure Communication Services (ACS). It enables organizations to maintain Okta's SMS MFA capabilities while using their own Azure telephony infrastructure.
 
-## Architecture
+## 🎯 Key Features
 
-Okta (Telephony Inline Hook) → Azure Function (HTTP trigger) → ACS SMS  
-(Optional): ACS → Event Grid → Function/App Insights for delivery reports
+- **Okta Integration** - Seamless telephony inline hook implementation
+- **ACS SMS Delivery** - Support for short codes, toll-free, and long codes
+- **Fast Response** - Optimized for Okta's synchronous hook requirements (<3s)
+- **Secure Authentication** - Basic auth or OAuth 2.0 support
+- **Delivery Tracking** - Optional Event Grid integration for delivery reports
+- **Production Ready** - Comprehensive error handling and logging
+
+## 📐 Architecture
 
 ```
+┌─────────────────────────────────────────────────────────────────┐
+│ Okta (Telephony Inline Hook)                                    │
+└────────────────────┬────────────────────────────────────────────┘
+                     │ HTTP POST (OTP Request)
+                     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Azure Function (HTTP Trigger)                                   │
+│  • Validate authentication                                      │
+│  • Parse Okta payload                                           │
+│  • Send SMS via ACS                                             │
+│  • Return status to Okta                                        │
+└────────────────────┬────────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Azure Communication Services                                    │
+│  • SMS delivery via short code/long code                        │
+│  • Delivery report generation                                   │
+└────────────────────┬────────────────────────────────────────────┘
+                     │
+                     ├──────────────────┬─────────────────────────┐
+                     ▼                  ▼                         ▼
+              ┌──────────┐      ┌──────────────┐        ┌────────────┐
+              │ End User │      │ Event Grid   │        │ App        │
+              │   SMS    │      │  (Optional)  │        │ Insights   │
+              └──────────┘      └──────────────┘        └────────────┘
+```
 
+## 📁 Project Structure
+
+```
 okta-telephony-acs-sms-provider/
 ├── host.json
-├── local.settings.json             # local dev only; never commit secrets
+├── local.settings.json             # Local dev settings (never commit)
 ├── requirements.txt
-├── telephony\_hook/
-│   ├── **init**.py                 # HTTP-triggered function
+├── telephony_hook/
+│   ├── __init__.py                 # Main function handler
 │   └── function.json
 ├── sample/
-│   └── request.json                # sample Okta payload for local tests
+│   └── request.json                # Sample Okta payload for testing
 └── scripts/
-└── curl-test.sh                # quick local test script
-
-````
-
----
-
-## Prerequisites
-
-**Okta**
-- An **Inline Hook** configured for *Telephony*.  
-- Hook auth (Basic or OAuth 2.0).  
-- Note: Telephony hooks are synchronous and expect a fast response (a few seconds). Keep your code and hosting plan sized accordingly.
-
-**Azure**
-- An **Azure Communication Services** resource with SMS enabled (short code, toll-free, or long code that your use case/region supports).
-- An **Azure Function App** (Python) with Application Settings for secrets.
+    └── curl-test.sh                # Local testing script
+```
 
 ---
 
-## Configuration
+## 📝 Prerequisites
 
-Set these settings (names can be changed to match your code). For local dev, use `local.settings.json`. In Azure, set as **Application Settings** on the Function App. For production, prefer **Key Vault** references.
+**Okta Requirements:**
+- Okta tenant with Telephony Inline Hook capability
+- Authentication configured (Basic Auth or OAuth 2.0)
+- Understanding that telephony hooks are synchronous (3 second timeout)
 
-| Setting                   | Purpose                                                   | Example / Notes                                 |
+**Azure Requirements:**
+- Azure Communication Services resource with SMS enabled
+- Supported sender type: short code, toll-free, or long code
+- Azure Function App (Python runtime)
+- Azure Key Vault (recommended for secrets management)
+
+**Development Tools:**
+- Python 3.8+
+- Azure Functions Core Tools
+- Azure CLI
+
+---
+
+## ⚙️ Configuration
+
+### Environment Variables
+
+Configure these settings in `local.settings.json` for local development, or as Application Settings in Azure Function App for production.
+
+| Setting                   | Purpose                                                   | Example                                          |
 |---------------------------|-----------------------------------------------------------|--------------------------------------------------|
-| `OKTA_USER`               | Fixed Basic username (if using Basic)                    | `okta`                                          |
-| `OKTA_BASIC_SECRET`       | Shared secret for Basic auth                             | Store in Key Vault / App Settings               |
-| `ACS_CONNECTION_STRING`   | ACS connection string                                    | From ACS “Keys”                                  |
-| `ACS_SENDER`              | Sender ID (short code, toll-free, or E.164 number)       | e.g., `12345` or `+15551234567`                 |
+| `OKTA_USER`               | Basic auth username (fixed value)                        | `okta`                                           |
+| `OKTA_BASIC_SECRET`       | Shared secret for Basic authentication                   | Store in Key Vault                               |
+| `ACS_CONNECTION_STRING`   | Azure Communication Services connection string           | From ACS resource "Keys" blade                   |
+| `ACS_FROM_SHORTCODE`      | Sender phone number or short code                        | `12345` or `+15551234567`                        |
 
-> If you’re using OAuth 2.0 for the Okta hook instead of Basic, document those settings here and remove the Basic ones.
+**Security Note:** Always use Azure Key Vault references for secrets in production environments.
 
 ---
 
-## Local Development
+## 🚀 Quick Start
 
-1) **Create virtualenv & install**
+### Local Development
+
+**1. Set up Python environment**
 ```bash
 python -m venv .venv
-# Windows: .venv\Scripts\Activate ; macOS/Linux:
-source .venv/bin/activate
+source .venv/bin/activate  # On Windows: .venv\Scripts\Activate
 pip install -r requirements.txt
-````
+```
 
-2. **Run**
-
+**2. Start the function**
 ```bash
 func start
 ```
 
-3. **Test locally**
+The function will be available at `http://localhost:7071/api/okta-telephony`
 
+**3. Test locally**
 ```bash
+# Using the provided test script
 bash scripts/curl-test.sh
-# or manually:
-curl -sS -X POST "http://localhost:7071/api/<function-route>" \
+
+# Or manually
+curl -sS -X POST "http://localhost:7071/api/okta-telephony" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Basic <base64(okta:<OKTA_BASIC_SECRET>)>" \
+  -H "Authorization: Basic $(echo -n 'okta:supersecret' | base64)" \
   --data @sample/request.json | jq
 ```
 
-> Replace `<function-route>` with your function route name. By default this is the **function folder name** unless overridden in `function.json`.
+### Azure Deployment
 
----
-
-## Deploy to Azure
-
-Using Azure Functions Core Tools:
+Deploy the function to Azure:
 
 ```bash
-# From repo root:
 func azure functionapp publish <your-function-app-name>
 ```
 
-(Optionally add GitHub Actions or Azure DevOps for CI/CD. I can provide a workflow if you’d like.)
+After deployment, configure the Application Settings in Azure Portal with your production values.
 
 ---
 
-## Okta Inline Hook Setup
+## 🔗 Okta Inline Hook Configuration
 
-* **Invoke URL**: `https://<your-function-app>.azurewebsites.net/api/<function-route>`
-* **Auth**:
+### Hook Setup
 
-  * **Basic**: `Authorization: Basic <base64(okta:<OKTA_BASIC_SECRET>)>`
-  * or **OAuth 2.0** client credentials if you prefer not to use static secrets.
-* Enable the **Phone (SMS)** authenticator and preview to verify `status: "SUCCESS"` responses.
+Configure the inline hook in your Okta admin console:
 
-**Sample Okta request body**
+- **Endpoint URL**: `https://<your-function-app>.azurewebsites.net/api/okta-telephony`
+- **Authentication**: Basic Authentication
+  - Username: `okta`
+  - Password: Your `OKTA_BASIC_SECRET` value
+
+### Request Format
+
+Okta sends the following payload:
 
 ```json
 {
@@ -126,7 +170,9 @@ func azure functionapp publish <your-function-app-name>
 }
 ```
 
-**Sample function response shape (simplified)**
+### Response Format
+
+The function returns:
 
 ```json
 {
@@ -136,7 +182,7 @@ func azure functionapp publish <your-function-app-name>
       "value": {
         "status": "SUCCESS",
         "provider": "ACS",
-        "transactionId": "message-id-or-correlation",
+        "transactionId": "message-id-from-acs",
         "transactionMetadata": "shortcode"
       }
     }
@@ -144,37 +190,91 @@ func azure functionapp publish <your-function-app-name>
 }
 ```
 
----
+**Status Values:**
+- `SUCCESS` - SMS sent successfully via ACS
+- `FAILED` - Error occurred (authentication failure, missing config, ACS error, etc.)
 
-## Delivery Status (Recommended)
-
-For operational visibility:
-
-* Create an **Event Grid Subscription** on ACS for `SMSDeliveryReportReceived`.
-* Handle events with another Function (EventGrid trigger) and write to **Application Insights** (or storage/queue) for auditing and alerting.
-* Correlate with `transactionId` (message ID) returned by ACS.
-
-I can add a sample Event Grid handler on request.
+Use Okta's inline hook preview feature to test the integration before enabling it for production users.
 
 ---
 
-## Security Notes
+## 📊 Monitoring & Delivery Reports
 
-* Keep responses fast to avoid Okta timeouts; fail fast and return `FAILED` instead of letting requests time out.
-* Store secrets in **Key Vault**; reference them from Function App settings.
-* Consider Function App **Access Restrictions** or front with **API Management**.
-* Prefer **OAuth 2.0** over Basic for hook auth when feasible.
+### Application Insights
+
+The function logs all operations to Application Insights:
+- Authentication attempts
+- Payload validation results
+- ACS API calls and responses
+- Error conditions
+
+### Optional: SMS Delivery Reports
+
+For full visibility into SMS delivery status:
+
+1. **Create Event Grid Subscription** on your ACS resource:
+   - Event Type: `SMSDeliveryReportReceived`
+   - Endpoint: New Azure Function with Event Grid trigger
+
+2. **Process delivery events** in the handler function:
+   - Extract delivery status (Delivered, Failed, etc.)
+   - Log to Application Insights
+   - Correlate with `transactionId` from original request
+
+3. **Set up alerts** for delivery failures or low success rates
+
+This provides end-to-end observability from Okta request through to carrier delivery.
 
 ---
 
-## Troubleshooting
+## 🔐 Security Considerations
 
-| Symptom                                    | Likely Cause                       | Fix                                                                      |
+**Authentication:**
+- Function implements Basic authentication validation
+- Okta must provide correct credentials on every request
+- Consider OAuth 2.0 for enhanced security
+
+**Secrets Management:**
+- Store all secrets in Azure Key Vault
+- Reference Key Vault secrets in Function App Application Settings
+- Never commit `local.settings.json` to source control
+
+**Network Security:**
+- Use Function App Access Restrictions to limit inbound traffic
+- Consider Azure API Management for additional security layers
+- Enable HTTPS only (enforced by default)
+
+**Performance:**
+- Okta expects response within 3 seconds
+- Function fails fast on errors to avoid timeouts
+- Use appropriate App Service Plan for production workloads
+
+---
+
+## 🐛 Troubleshooting
+
+| Issue                                      | Cause                              | Resolution                                                               |
 | ------------------------------------------ | ---------------------------------- | ------------------------------------------------------------------------ |
-| `401 Unauthorized` from function           | Bad/missing `Authorization` header | Verify Okta hook auth settings and secret/client credentials             |
-| Okta reports timeout                       | Cold start / long ACS call         | Use a suitable plan, pre-warm, handle timeouts, return fast on errors    |
-| ACS shows accepted but user didn't get SMS | Carrier filtering / invalid number | Wire up delivery reports; check `transactionId` path                     |
-| `400` from function                        | Payload shape differs              | Validate `phoneNumber`, `otpCode`, `deliveryChannel == "SMS"` in handler |
+| `401 Unauthorized` response                | Invalid Authorization header       | Verify Okta hook credentials match `OKTA_BASIC_SECRET`                   |
+| Okta timeout error                         | Slow function execution            | Check App Service Plan, review Application Insights for bottlenecks      |
+| `FAILED` status with valid config          | ACS API error                      | Review function logs for ACS error details, verify connection string     |
+| Messages not received by users             | Carrier filtering or invalid number| Enable ACS delivery reports, verify phone number format                  |
+| `400 Bad Request`                          | Malformed payload                  | Validate Okta payload contains required fields                           |
+
+**Debugging Steps:**
+1. Review Application Insights logs for detailed error messages
+2. Test locally using `curl-test.sh` script
+3. Verify all environment variables are configured correctly
+4. Check ACS resource for SMS capability and quota
+5. Confirm sender number is provisioned and enabled for SMS
+
+---
+
+## 📚 Additional Resources
+
+- [Okta Telephony Inline Hook Documentation](https://developer.okta.com/docs/concepts/inline-hooks/#telephony-inline-hook)
+- [Azure Communication Services SMS Documentation](https://docs.microsoft.com/azure/communication-services/concepts/sms/sdk-features)
+- [Azure Functions Python Developer Guide](https://docs.microsoft.com/azure/azure-functions/functions-reference-python)
 
 ---
 
