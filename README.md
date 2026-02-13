@@ -283,3 +283,11 @@ This provides end-to-end observability from Okta request through to carrier deli
 **Built with ❤️ following Azure Well-Architected Framework best practices**
 
 </div>
+
+## Contributing
+
+Contributions welcome! Please open an issue or pull request.
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
