@@ -1,0 +1,11 @@
+
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "ACS_CONNECTION_STRING": "endpoint=https://<acs-resource-name>.communication.azure.com/;accesskey=<access-key>",
+    "ACS_FROM_SHORTCODE": "<short-code-or-sender-number>",
+    "OKTA_BASIC_SECRET": "<shared-secret-for-basic-auth>"
+  }
+}

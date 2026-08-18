@@ -50,7 +50,7 @@ This Azure Function implements an Okta Telephony Inline Hook endpoint that proce
 ```
 okta-telephony-acs-sms-provider/
 ├── host.json
-├── local.settings.json             # Local dev settings (never commit)
+├── local.settings.json.example     # Copy to local.settings.json (gitignored)
 ├── requirements.txt
 ├── telephony_hook/
 │   ├── __init__.py                 # Main function handler
@@ -87,7 +87,13 @@ okta-telephony-acs-sms-provider/
 
 ### Environment Variables
 
-Configure these settings in `local.settings.json` for local development, or as Application Settings in Azure Function App for production.
+For local development, copy the template and fill in your values:
+
+```bash
+cp local.settings.json.example local.settings.json
+```
+
+`local.settings.json` is gitignored. In production, set these as Application Settings on the Azure Function App instead.
 
 | Setting                   | Purpose                                                   | Example                                          |
 |---------------------------|-----------------------------------------------------------|--------------------------------------------------|
