@@ -4,21 +4,21 @@ Okta Telephony Inline Hook -> Azure Communication Services (ACS) SMS (short code
 
 Purpose:
 - Receive Okta's telephony inline hook (OTP request) over HTTPS.
-- Validate caller (optional Basic auth).
+- Validate caller using required Basic authentication.
 - Send the OTP to the end-user via ACS SMS using a SHORT CODE as the sender.
 - Return an Okta-formatted "commands" response with SUCCESS/FAILED and a transactionId.
 
 Environment variables:
 - ACS_CONNECTION_STRING : ACS connection string (endpoint + access key)
 - ACS_FROM_SHORTCODE    : The short code to use as the sender (e.g., "12345")
-- OKTA_BASIC_SECRET     : If set, require header Authorization: Basic base64("okta:<secret>")
+- OKTA_BASIC_SECRET     : Required secret for Authorization: Basic base64("okta:<secret>")
 
 Notes:
-- We always respond HTTP 200 so Okta can decide how to proceed, with status in the payload.
+- Unauthorized requests receive HTTP 401; authorized hook outcomes use HTTP 200 and payload status.
 - Keep the handler fast (<~3s). Avoid waiting for downstream delivery receipts (handle asynchronously).
 """
 
-import os, json, base64, logging
+import os, json, base64, logging, hmac
 import azure.functions as func
 from azure.communication.sms import SmsClient
 
@@ -44,15 +44,15 @@ def _ok(resp_status: str, message_id: str = "unknown", meta: str = "shortcode"):
 
 def _authorized(req: func.HttpRequest) -> bool:
     """
-    Optional Basic-auth gate. If OKTA_BASIC_SECRET is set, require:
+    Require OKTA_BASIC_SECRET and:
       Authorization: Basic base64("okta:<secret>")
     """
     secret = os.getenv("OKTA_BASIC_SECRET")
     if not secret:
-        return True  # Auth disabled if no secret configured
+        return False
     auth = req.headers.get("authorization", "")
     expected = "Basic " + base64.b64encode(f"{OKTA_USER}:{secret}".encode()).decode()
-    return auth == expected
+    return hmac.compare_digest(auth.encode('utf-8'), expected.encode('utf-8'))
 
 def _render_message(template: str, code: str) -> str:
     """
@@ -72,7 +72,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         # (1) Caller authorization
         if not _authorized(req):
             return func.HttpResponse(json.dumps(_ok("FAILED", meta="unauthorized")),
-                                     status_code=200, mimetype="application/json")
+                                     status_code=401, mimetype="application/json")
 
         # (2) Parse JSON body from Okta
         try:
@@ -110,8 +110,8 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         )
 
         first = result[0] if isinstance(result, list) else result
-        ok = getattr(first, "successful", False)
-        message_id = getattr(first, "message_id", None) or getattr(first, "messageId", None) or "unknown"
+        ok = first.get("successful", False)
+        message_id = first.get("messageId") or "unknown"
 
         # (6) Respond to Okta
         return func.HttpResponse(json.dumps(_ok("SUCCESS" if ok else "FAILED", message_id=message_id)),
